@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>화학 AI 튜터 - 안전버전 (단원별 확장 가능)</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --transition-fast: 0.15s ease-in-out;
+            --transition-slow: 0.3s ease-in-out;
+        }
+        
+        /* ========================================
+           기본 스타일 리셋
+        ======================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            overflow-x: hidden;
+        }
+        
+        /* ========================================
+           로딩 화면 스타일
+        ======================================== */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-content {
+            text-align: center;
+            color: white;
+            animation: fadeInUp 0.8s ease-out;
+        }
+        
+        .molecule-animation {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+        }
+        
+        .atom {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            opacity: 0.8;
+            animation: atomOrbit 2s linear infinite;
+        }
+        
+        .atom:nth-child(1) {
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .atom:nth-child(2) {
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+        }
+        
+        .atom:nth-child(3) {
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .atom:nth-child(4) {
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+        }
+        
+        .center-atom {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+        }
+        
+        .loading-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .loading-subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+        
+        .loading-text {
+            font-size: 1rem;
+            margin-top: 1rem;
+            opacity: 0.8;
+        }
+        
+        /* ========================================
+           메인 앱 컨테이너
+        ======================================== */
+        .app-container {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        
+        .app-container.visible {
+            display: block;
+            opacity: 1;
+        }
+        
+        /* ========================================
+           헤더 스타일
+        ======================================== */
+        .app-header {
+            background: var(--bg-gradient);
+            color: white;
+            box-shadow: var(--card-shadow);
+            padding: 1rem 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .app-title {
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        .app-subtitle {
+            font-size: 1rem;
+            text-align: center;
+            margin-top: 0.5rem;
+            opacity: 0.9;
+        }
+        
+        /* ========================================
+           메인 콘텐츠 스타일
+        ======================================== */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--card-shadow);
+            transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+            cursor: pointer;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-description {
+            color: #6b7280;
+            line-height: 1.6;
+        }
+        
+        /* ========================================
+           채팅 인터페이스 스타일
+        ======================================== */
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: var(--bg-gradient);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .chat-header h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #f9fafb;
+        }
+        
+        .message {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message.assistant {
+            align-items: flex-start;
+        }
+        
+        .message.user {
+            align-items: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 70%;
+            padding: 1rem;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        
+        .message.assistant .message-bubble {
+            background: white;
+            border: 1px solid #e5e7eb;
+            color: #1f2937;
+        }
+        
+        .message.user .message-bubble {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+        
+        .chat-input-container {
+            padding: 1.5rem;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .chat-input-wrapper {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+        
+        .chat-input {
+            flex: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 1rem;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .send-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+            min-width: 80px;
+        }
+        
+        .send-button:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+        
+        .send-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        /* ========================================
+           반응형 디자인
+        ======================================== */
+        @media (max-width: 768px) {
+            .app-header {
+                padding: 1rem;
+            }
+            
+            .main-content {
+                padding: 0 1rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .message-bubble {
+                max-width: 85%;
+            }
+            
+            .chat-input-wrapper {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .send-button {
+                width: 100%;
+            }
+        }
+        
+        /* ========================================
+           애니메이션 정의
+        ======================================== */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes atomOrbit {
+            0% { transform: translate(-50%, -50%) rotate(0deg) translateX(50px) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg) translateX(50px) rotate(-360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+        
+        /* ========================================
+           유틸리티 클래스
+        ======================================== */
+        .hidden {
+            display: none !important;
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- ========================================
+         로딩 화면
+    ======================================== -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loading-content">
+            <div class="molecule-animation">
+                <div class="atom"></div>
+                <div class="atom"></div>
+                <div class="atom"></div>
+                <div class="atom"></div>
+                <div class="center-atom"></div>
+            </div>
+            <h1 class="loading-title">化学 AI 튜터</h1>
+            <p class="loading-subtitle">학생과 함께 성장하는 차세대 교육 플랫폼</p>
+            <p class="loading-text">시스템을 초기화하고 있습니다...</p>
+        </div>
+    </div>
+
+    <!-- ========================================
+         메인 앱
+    ======================================== -->
+    <div class="app-container" id="main-app">
+        <header class="app-header">
+            <h1 class="app-title">化学 AI 튜터</h1>
+            <p class="app-subtitle">전문적 화학 교육과 AI 기반 학습 플랫폼</p>
+        </header>
+
+        <main class="main-content">
+            <!-- 기능 카드들 -->
+            <div class="features-grid">
+                <div class="feature-card" onclick="handleFeatureClick('concept-map')">
+                    <div class="feature-icon">🗺️</div>
+                    <h3 class="feature-title">개념지도</h3>
+                    <p class="feature-description">화학과목의 모든 개념을 연결된 지도 형태로 시각화하여 학습하세요.</p>
+                </div>
+
+                <div class="feature-card" onclick="handleFeatureClick('misconception')">
+                    <div class="feature-icon">🔍</div>
+                    <h3 class="feature-title">오개념 진단</h3>
+                    <p class="feature-description">개인 맞춤형 진단을 통해 오개념을 발견하고 정확히 교정하세요.</p>
+                </div>
+
+                <div class="feature-card" onclick="handleFeatureClick('report')">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title">평가 보고서</h3>
+                    <p class="feature-description">학습 진도와 약점을 분석하여 개인별 학습 계획을 제안합니다.</p>
+                </div>
+            </div>
+
+            <!-- 채팅 인터페이스 -->
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h3>AI 튜터와 대화하기 💬 (즉시 답변)</h3>
+                    <p>공업화학 전문가와 실시간으로 대화하세요. 구체적이고 전문적인 답변을 제공합니다.</p>
+                </div>
+                
+                <div class="chat-messages" id="chat-messages">
+                    <!-- 메시지들이 여기에 표시됩니다 -->
+                </div>
+                
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            id="chat-input" 
+                            class="chat-input" 
+                            placeholder="예: 촉매의 원리를 알려주세요 / 평형상수 계산법 / Haber법의 원리 / 원자의 구성요소"
+                            rows="1"
+                            oninput="updateButtonState()"
+                            onkeypress="handleKeyPress(event)"
+                        ></textarea>
+                        <button id="send-button" class="send-button" onclick="sendMessage()">전송</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ========================================
+        // 전역 변수
+        // ========================================
+        let isSystemReady = false;
+        
+        // ========================================
+        // 로딩 화면 관리 (강화된 안전장치)
+        // ========================================
+        function hideLoadingScreen() {
+            const loadingScreen = document.getElementById('loading-screen');
+            const mainApp = document.getElementById('main-app');
+            
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+            
+            if (mainApp) {
+                mainApp.style.display = 'block';
+                setTimeout(() => {
+                    mainApp.classList.add('visible');
+                }, 100);
+            }
+            
+            isSystemReady = true;
+        }
+        
+        // ========================================
+        // 전역 오류 처리 (강화됨)
+        // ========================================
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript 오류:', e.error);
+            hideLoadingScreen();
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Promise 거부:', e.reason);
+            hideLoadingScreen();
+        });
+        
+        // ========================================
+        // 여러 안전장치 (강화됨)
+        // ========================================
+        setTimeout(() => {
+            console.log('⏰ 1초 안전장치');
+            hideLoadingScreen();
+        }, 1000);
+
+        setTimeout(() => {
+            console.log('⏰ 2초 절대 안전장치');
+            hideLoadingScreen();
+        }, 2000);
+
+        setTimeout(() => {
+            console.log('⏰ 3초 최종 안전장치');
+            hideLoadingScreen();
+        }, 3000);
+
+        // ========================================
+        // 채팅 기능 (버튼 활성화 문제 해결)
+        // ========================================
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        // 입력 필드에서 텍스트 변경 시 버튼 상태 업데이트
+        function updateButtonState() {
+            const chatInput = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-button');
+            const hasText = chatInput.value.trim().length > 0;
+            sendButton.disabled = !hasText;
+        }
+
+        function sendMessage() {
+            const chatInput = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const message = chatInput.value.trim();
+            if (!message) return;
+            
+            // 버튼 일시 비활성화 (중복 전송 방지)
+            sendButton.disabled = true;
+            
+            // 사용자 메시지 추가
+            addMessage(message, 'user');
+            
+            // 입력창 초기화
+            chatInput.value = '';
+            
+            // AI 응답 즉시 생성 (지연 제거)
+            const response = generateAIResponse(message);
+            addMessage(response, 'assistant');
+            
+            // 응답 완료 후 버튼 재활성화
+            sendButton.disabled = false;
+            chatInput.focus(); // 입력 포커스 유지
+        }
+
+        function addMessage(text, sender) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.innerHTML = text;
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date().toLocaleTimeString('ko-KR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            messageDiv.appendChild(bubbleDiv);
+            messageDiv.appendChild(timeDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ========================================
+        // AI 응답 생성 함수 (안전한 버전)
+        // ========================================
+        function generateAIResponse(userMessage) {
+            const message = userMessage.toLowerCase();
+            
+            try {
+                // ======= 기본 인사 =======
+                if (message.includes('안녕') || message.includes('hello') || message.includes('hi') || message.includes('반갑')) {
+                    return `안녕하세요! 👋 화학 AI 튜터입니다.
+                    
+화학 반응, 공업 공정, 열역학, 물질의 구조 등 무엇이든 물어보세요!
+
+예시 질문:
+• "반응속도에 영향을 주는 요인은?"
+• "촉매의 원리를 설명해주세요"
+• "Haber법의 원리는?"
+• "평형상수를 어떻게 계산하나요?"
+• "원자의 구성요소는 무엇인가요?"
+
+전문적이고 구체적인 답변을 드리겠습니다! 🎯`;
+                }
+
+                // ======= 원자 구조 =======
+                if (message.includes('원자') || message.includes('양성자') || message.includes('중성자') || message.includes('전자') || message.includes('atom')) {
+                    return `원자는 물질을 구성하는 기본 단위예요!
+
+🧬 **원자의 구성**:
+• **양성자(p⁺)**: 원자 번호 결정, 양전하 (+1)
+• **중성자(n⁰)**: 원자 질량 결정, 무전하 (0)
+• **전자(e⁻)**: 껍질 배치, 음전하 (-1)
+
+📊 **핵심 관계**:
+• 원자번호 = 양성자수 = 전자수 (중성 원자)
+• 원자질량 = 양성자수 + 중성자수
+• 이온: 전자수 ≠ 양성자수 (전하 발생)
+
+⚛️ **전자 배치 규칙**:
+• 1s² 2s² 2p⁶ 3s² 3p⁶ 4s² 3d¹⁰ 4p⁶...
+• 낮은 에너지 껍질부터 차례로 배치
+• 8전자 규칙(Octet rule) 적용
+
+🎯 **핵심 공식**: 원자번호(Z) = 양성자수 = 전자수 (중성)`;
+                }
+
+                // ======= 주기율표 =======
+                if (message.includes('주기율') || message.includes('주기율표') || message.includes('족') || message.includes('주기') || message.includes('periodic')) {
+                    return `주기율표는 원소들의 성질이 주기적으로 변하는 법칙을 보여줘요!
+
+📋 **주기율의 구조**:
+• **주기(Period)**: 원자번호 순으로 배열된 가로줄
+• **족(Group/Family)**: 세로줄, 유사한 성질의 원소들
+
+🔄 **주기적 성질 변화**:
+• **원자 반지름**: 주기↓ = 반지름↓, 족↓ = 반지름↑
+• **이온화 에너지**: 주기↓ = 에너지↑, 족↓ = 에너지↓
+• **전기 음성도**: 주기↓ = 전기음성↑, 족↓ = 전기음성↓
+• **산화수**: 같은 족에서는 일정한 패턴
+
+🏭 **주요 족들**:
+• **1족(알칼리 금속)**: Li, Na, K (+1 산화수)
+• **2족(알칼리토리움)**: Be, Mg, Ca (+2 산화수)
+• **17족(할로겐)**: F, Cl, Br, I (-1 산화수)
+• **18족(비활성 기체)**: He, Ne, Ar, Kr (완전자 배치)
+
+📊 **결정적 예시**: Na(11): 1s² 2s² 2p⁶ 3s¹ → 3족 알칼리 금속`;
+                }
+
+                // ======= 몰 개념 =======
+                if (message.includes('몰') || message.includes('mol') || message.includes('아보가드로')) {
+                    return `몰(mol)은 물질의 양을 나타내는 기본 단위예요!
+
+🧮 **몰의 정의**:
+• **1mol = 6.02×10²³개** (아보가드로 수, NA)
+• 기본 입자(원자, 분자, 이온) 수를 나타내는 단위
+
+⚖️ **기본 계산식**:
+• **몰질량(M)**: g/mol 단위
+• **질량(m)**: g 단위  
+• **몰수(n)**: mol 단위
+• **입자 수(N)**: 개 단위
+
+🔄 **상호 변환**:
+• n = m/M (몰수 = 질량/몰질량)
+• N = n × NA (입자수 = 몰수 × 아보가드로 수)
+• m = n × M (질량 = 몰수 × 몰질량)
+
+📊 **실제 예시**:
+• **물(H₂O)**: M = 18.0 g/mol
+  9.0g H₂O = 0.5mol = 3.01×10²³개 분자
+• **염화나트륨(NaCl)**: M = 58.5 g/mol
+  11.7g NaCl = 0.2mol = 1.20×10²³개 이온쌍
+
+💡 **핵심**: 모든 물질에서 1mol = 6.02×10²³개!`;
+                }
+
+                // ======= 화학 반응식 =======
+                if (message.includes('화학 반응식') || message.includes('반응식') || message.includes('chemical equation')) {
+                    return `화학 반응식은 화학반응을 화학식으로 나타낸 표현이에요!
+
+⚖️ **질량 보존의 법칙**:
+• 반응 전후 **원자의 종류와 수가 동일**
+• 반응 전후 **총 질량이 동일**
+• 반응 전후 **전하가 동일**
+
+📝 **반응식 작성 절차**:
+1. 반응물과 생성물 확인
+2. 화학식 작성 (정확한 화학식)
+3. 계수 조정 (원자 수 맞추기)
+4. 상태 표시 (s,l,g,aq) 추가
+
+🎯 **예시: 메탄의 연소**:
+CH₄(g) + 2O₂(g) → CO₂(g) + 2H₂O(g)
+• C: 1=1, H: 4=4, O: 4=4 ✓
+• 반응물: CH₄ + 2O₂
+• 생성물: CO₂ + 2H₂O
+
+🔄 **계수 의미**:
+• 계수 = 분자 수 or 몰수 비율
+• 예: 2H₂ = 2몰 H₂ = 1.204×10²⁴개 H₂ 분자
+
+🏭 **공업적 중요성**: 화학공정 설계의 기초!`;
+                }
+
+                // ======= 화학 결합 =======
+                if (message.includes('결합') || message.includes('bond') || message.includes('이온') || message.includes('공유') || message.includes('금속')) {
+                    return `화학 결합은 원자들이 안정한 전자 배치를 얻기 위해 형성해요!
+
+⚛️ **결합의 종류**:
+
+🔗 **이온 결합 (Ionic Bond)**:
+• **원리**: 전자 이동 → 양이온(+) + 음이온(-) 
+• **예시**: NaCl (Na → Na⁺ + e⁻, Cl + e⁻ → Cl⁻)
+• **성질**: 고체 상태, 높은 융점·비점, 수용액 전도성
+
+🔗 **공유 결합 (Covalent Bond)**:
+• **원리**: 전자 공유 → 분자 형성
+• **예시**: H₂ (H• + •H → H:H), H₂O (H-O-H)
+• **성질**: 분자상, 낮은 융점·비점 (분자간력)
+
+🔗 **금속 결합 (Metallic Bond)**:
+• **원리**: 전자가 자유전자海洋처럼 이동
+• **성질**: 전기·열전도성, 연성·전성, 광택
+
+⚡ **결합의 강도**:
+이온 > 공유 > 금속 (일반적 경향)
+
+🎯 **규칙성**: 8전자 규칙 (Octet rule) 만족 방향으로 결합`;
+                }
+
+                // ======= 극성과 분자 구조 =======
+                if (message.includes('극성') || message.includes('비극성') || message.includes('분자 구조') || message.includes('polarity')) {
+                    return `극성은 분자 내 전하 분포의 불균형을 나타내요!
+
+⚡ **극성 판단**:
+• **전기 음성도 차이**: ΔEN > 1.7 → 이온성
+• **ΔEN = 0.4~1.7 → 극성 공유결합**
+• **ΔEN < 0.4 → 비극성 공유결합**
+
+🔄 **극성/비극성 예시**:
+• **극성 분자**: H₂O, NH₃, HCl (비대칭 구조)
+• **비극성 분자**: H₂, O₂, CH₄ (대칭 구조)
+• **부분 극성**: C-H (ΔEN = 0.4, 비극성)
+
+📐 **분자 구조와 극성**:
+• **직선형**: CO₂ (O=C=O) → 비극성
+• **굽은형**: H₂O (H-O-H, 104.5°) → 극성
+• **삼각평면**: BF₃ → 비극성
+• **사면체**: CH₄ → 비극성, NH₃ → 극성
+
+💧 **물리적 성질**:
+• **극성 분자**: 물에 잘 용해, 극성 용매에 녹음
+• **비극성 분자**: 기름에 잘 용해, 비극성 용매에 녹음
+
+🧪 **"유사상溶의 원리"**: 극성-극성, 비극성-비극성`;
+                }
+
+                // ======= 반응속도 관련 질문 =======
+                if (message.includes('반응') || message.includes('rate') || message.includes('속도')) {
+                    return `화학반응 속도는 주로 4가지 요소에 영향을 받아요:
+
+🔥 **온도 효과**: 10°C 증가시 약 2-3배 증가 (아레니우스 법칙)
+🌊 **농도 효과**: 농도가 높을수록 충돌 빈도 증가
+⚗️ **촉매**: 활성화에너지(Ea) 감소로 속도 증가
+📏 **표면적**: 고체 반응물의 표면적이 클수록 빠른 반응
+
+**실제 예시**: NH₃ + O₂ → NO (아모니아 산화)
+• 온도 900°C→1000°C: 반응속도 2배 증가
+• 촉매 Pt-Rh 사용 시 반응속도 10³배 증가`;
+                }
+
+                // ======= 촉매 관련 =======
+                if (message.includes('촉매') || message.includes('catalyst')) {
+                    return `촉매는 화학반응을 더 빠르고 효율적으로 만들어주는 물질이에요!
+
+🎯 **작동 원리**:
+• 활성화에너지(Ea)를 낮춰 충돌 에너지 부족 보완
+• 새로운 반응경로 제공 (Alternative pathway)
+• 자체는 반응 후 재생 (재생성)
+
+🏭 **주요 촉매들**:
+• **플래티넘**: 자동차 촉매, 암모니아 합성
+• **바나듐**: 황산 제조 (Contact process)
+• **니켈**: 불포화화합물 수화반응
+• **제올라이트**: 정제공정, 석유화학
+
+⚡ **선택성**: 원하는 생성물만 선택적으로 만듦`;
+                }
+
+                // ======= Haber법 =======
+                if (message.includes('haber') || message.includes('해버') || message.includes('암모니아') || message.includes('ammonia')) {
+                    return `Haber법은 질소와 수소를 이용해 암모니아를 합성하는 중요한 공업 방법이에요!
+
+🧪 **핵심 반응식**:
+**N₂ + 3H₂ ⇌ 2NH₃** (ΔH = -92 kJ/mol, 발열반응)
+
+⚙️ **공업 조건**:
+• **온도**: 400-450°C (최적화 필요)
+• **압력**: 150-300 기압 (일반적 200 기압)
+• **촉매**: Fe (철) 촉매 + K₂O, Al₂O₃ 촉진제
+• **수용률**: 약 15-20% (평형 특성)
+
+🔄 **르샤틀리에 원리 적용**:
+• **압력↑**: 분자 수 감소 방향 (NH₃ 생성 유리)
+• **온도↓**: 발열반응이므로 NH₃ 생성 유리 (속도 문제)
+• **촉매**: 반응속도 증가 (평형 영향X)
+
+🏭 **공업적 의의**:
+• **식량 생산**: 비료(요소, 질산암모늄) 제조
+• **화학 원료**: 니트로벤젠, 요소수지 등
+• **규모**: 전 세계 연간 1억 5천만 톤 생산
+
+👨‍🔬 **역사**: Fritz Haber (1909년) → Carl Bosch (공업화, 1913년)
+**Nobel 상**: Fritz Haber (1918년, 화학상)
+
+⚡ **기술적 개선**: 에너지 절감, CO₂ 배출 저감 기술 개발 중`;
+                }
+
+                // ======= 평형 관련 =======
+                if (message.includes('평형') || message.includes('equilibrium')) {
+                    return `화학평형은 정반응과 역반응이 같은 속도로 진행되는 상태예요!
+
+⚖️ **평형 상수**: K = [생성물]^계수 / [반응물]^계수
+
+🔄 **르샤틀리에 원리**:
+• **온도↑**: 흡열반응 방향으로 이동
+• **압력↑**: 분자 수가 적은 방향으로 이동  
+• **농도↑**: 그 물질을 소모하는 방향으로 이동
+
+📊 **실제 사례**:
+• **합성가스**: CO + 2H₂ ⇌ CH₃OH (ΔH = -90 kJ/mol)
+• **암모니아**: N₂ + 3H₂ ⇌ 2NH₃ (ΔH = -92 kJ/mol)`;
+                }
+
+                // ======= 구체적인 화학 질문 =======
+                else if (message.length > 3) {
+                    return `구체적인 화학 질문이군요! 
+
+🔬 **주요 화학 주제들**:
+• **Ⅰ단원**: 원자 구조, 주기율표, 몰, 화학 결합, 극성
+• **반응속도**: 아레니우스 법칙, 촉매, 온도/농도 효과
+• **평형**: 르샤틀리에 원리, 평형상수, Le Chatelier
+• **열역학**: 엔탈피, 엔트로피, Gibbs 자유에너지
+• **공업공정**: Haber법, 황산 제조, 니켈 도금
+
+🏭 **공업공정**: "Haber법 원리", "황산 제조 과정"
+
+더 구체적인 질문 = 더 상세하고 정확한 답변! 어떤 화학 주제를 더 알고 싶으신가요?`;
+                }
+
+                // ======= Ⅱ단원: 화학반응 =======
+                if (message.includes('반응속도') || message.includes('reaction rate') || message.includes('속도') || message.includes('rate')) {
+                    return `반응속도는 화학반응이 진행되는 빠르기를 나타내는 값이에요!
+
+⏱️ **반응속도 정의**: Δ[생성물]/Δt 또는 -Δ[반응물]/Δt
+
+🔥 **반응속도에 영향을 주는 요인**:
+1. **온도**: 10°C 증가시 약 2-3배 증가 (아레니우스 법칙)
+2. **농도**: 농도가 높을수록 충돌 빈도 증가
+3. **촉매**: 활성화에너지(Ea) 감소로 속도 증가
+4. **표면적**: 고체 반응물의 표면적이 클수록 빠른 반응
+
+⚡ **아레니우스 식**: k = A × e^(-Ea/RT)
+• k: 반응속도상수
+• A: 빈도인자
+• Ea: 활성화에너지
+• R: 기체상수 (8.314 J/mol·K)
+• T: 절대온도 (K)
+
+📊 **실제 예시**:
+• **암모니아 산화**: 4NH₃ + 5O₂ → 4NO + 6H₂O
+• 900°C→1000°C: 반응속도 2배 증가
+• Pt-Rh 촉매 사용 시 속도 10³배 증가
+
+🎯 **공업 적용**: 촉매 선택, 온도 최적화, 압력 조정`;
+                }
+                
+                // ======= 평형상수 =======
+                if (message.includes('평형상수') || message.includes('equilibrium constant') || message.includes('Keq') || message.includes('Kc')) {
+                    return `평형상수는 정반응과 역반응의 속도비를 나타내는 값이에요!
+
+⚖️ **평형상수 정의**:
+K = [생성물]^계수 / [반응물]^계수
+
+🔢 **평형상수의 의미**:
+• **K >> 1**: 반응이 생성물 쪽으로 완전히 진행
+• **K << 1**: 반응이 반응물 쪽으로 거의 진행하지 않음  
+• **K ≈ 1**: 반응이 양쪽 모두 어느 정도 진행
+
+🧪 **반응별 평형상수 예시**:
+• **암모니아 합성**: N₂ + 3H₂ ⇌ 2NH₃
+  K = [NH₃]² / [N₂][H₂]³
+
+• **이온화**: HA ⇌ H⁺ + A⁻  
+  Ka = [H⁺][A⁻] / [HA] (산의 이온화상수)
+
+📐 **평형상수와 자유에너지**:
+ΔG° = -RT ln K
+• ΔG° < 0: 자발적 반응 (K > 1)
+• ΔG° > 0: 비자발적 반응 (K < 1)
+
+🎯 **공업 활용**: 공정 설계, 수율 예측, 최적 조건 결정`;
+                }
+                
+                // ======= 산염기 반응 =======
+                if (message.includes('산') || message.includes('염기') || message.includes('acid') || message.includes('base') || message.includes('pH') || message.includes('염기성')) {
+                    return `산과 염기는 프로톤(H⁺) 또는 수산화이온(OH⁻)의 이동을 관여하는 반응이에요!
+
+🧪 **산염기 정의**:
+• **브뢴스테드-로리**: 산(H⁺donor), 염기(H⁺acceptor)
+• **르위스**: 산(전자쌍 受容体), 염기(전자쌍 提供体)
+
+⚗️ **강산 vs 약산**:
+• **강산**: 완전 이온화 (HCl, H₂SO₄, HNO₃)
+• **약산**: 부분 이온화 (CH₃COOH, H₂CO₃)
+
+⚖️ **평형상수**:
+• **강산**: K >> 1 (완전 이온화)
+• **약산**: Ka << 1 (부분 이온화)
+
+💧 **pH 계산**:
+• **pH = -log[H⁺]**
+• **중성수**: [H⁺] = [OH⁻] = 10⁻⁷ M (25°C)
+• **산성**: pH < 7, **[H⁺] > 10⁻⁷ M**
+• **염기성**: pH > 7, **[H⁺] < 10⁻⁷ M**
+
+🧂 **염의 종류와 pH**:
+• **강산 + 강염**: 중성 (NaCl)
+• **강산 + 약염**: 산성 (NH₄Cl)
+• **약산 + 강염**: 염기성 (Na₂CO₃)
+• **약산 + 약염**: 약산성/약염기성
+
+🎯 **공업 적용**: pH 제어, 중화반응, 염 제조`;
+                }
+                
+                // ======= 중화반응 =======
+                if (message.includes('중화') || message.includes('중화반응') || message.includes('neutralization')) {
+                    return `중화반응은 산과 염기가 반응하여 물과 염을 만드는 반응이에요!
+
+🧪 **중화반응 일반식**:
+산 + 염기 → 물 + 염
+HCl + NaOH → NaCl + H₂O
+
+⚖️ **이론적 산량**:
+• **equivalence point**: 당량점 (산과 염기 반응 완료)
+• **equivalence**: 1OH⁻가 1H⁺를 중화
+
+📊 **당량 계산**:
+• **산**: N = M × n (N: 당량농도, M: 몰농도, n: 프로톤 수)
+• **염기**: N = M × n (OH⁻ 또는 H⁺ 수)
+
+🔥 **열중화**:
+ΔH = -57.1 kJ/mol (모든 강산-강염기 반응)
+H⁺(aq) + OH⁻(aq) → H₂O(l)
+
+📈 **적정 곡선**:
+• **강산-강염**: S-자형, pH = 7 (등점)
+• **약산-강염**: 당점에서 pH > 7
+• **강산-약염**: 당점에서 pH < 7
+
+🎯 **공업 활용**:산성/염기성 폐수 처리, 염 제조, 중화열 이용`;
+                }
+                
+                // ======= 반응열과 엔탈피 =======
+                if (message.includes('반응열') || message.includes('엔탈피') || message.includes('enthalpy') || message.includes('ΔH') || message.includes('헤스')) {
+                    return `반응열과 엔탈피는 화학반응의 에너지 변화를 나타내는 중요한 개념이에요!
+
+🔥 **엔탈피(ΔH) 정의**:
+• **ΔH = H(생성물) - H(반응물)**
+• **발열반응**: ΔH < 0 (열 방출)
+• **흡열반응**: ΔH > 0 (열 흡수)
+
+📊 **헤스의 법칙**:
+• 총 엔탈피 변화는 **경로와 무관**
+• 예시: C(graphite) → CO(g) → CO₂(g)
+• C(graphite) + O₂(g) → CO₂(g) (ΔH₁)
+• C(graphite) + ½O₂(g) → CO(g) (ΔH₂)
+• CO(g) + ½O₂(g) → CO₂(g) (ΔH₃)
+• **ΔH₁ = ΔH₂ + ΔH₃**
+
+⚡ **에너지 보존 법칙**:
+• 반응 전후 **총 에너지 동일**
+• 내부에너지 + P-V 일 = 엔탈피 변화
+
+📈 **응용 사례**:
+• **연소 반응**: CH₄ + 2O₂ → CO₂ + 2H₂O (ΔH = -890 kJ/mol)
+• **분석 반응**: Fe₂O₃ + 3CO → 2Fe + 3CO₂ (ΔH = -25 kJ/mol)
+
+🎯 **공업 활용**: 공정 설계, 에너지 효율, 열공학 계산`;
+                }
+                
+                // ======= 산화환원 반응 =======
+                if (message.includes('산화환원') || message.includes('산화') || message.includes('환원') || message.includes('redox') || message.includes('oxidation') || message.includes('reduction')) {
+                    return `산화환원 반응은 전자의 이동이 동반되는 중요한 화학반응이에요!
+
+⚡ **기본 정의**:
+• **산화**: 전자를 잃는 과정 (전자의 donation)
+• **환원**: 전자를 얻는 과정 (전자의 acceptance)
+• **환원제**: 산화를 일으키는 물질 (전자 제공자)
+• **산화제**: 환원을 일으키는 물질 (전자 수용자)
+
+🔢 **산화수 계산**:
+• **이온**: 원소의 전하 = 산화수
+• **중성 원자**: 산화수 = 0
+• **산소**: 일반적으로 -2 (Peroxide: -1)
+• **수소**: 일반적으로 +1 (Hydride: -1)
+
+🧪 **대표 반응들**:
+• **금속 제련**: Fe₂O₃ + 3CO → 2Fe + 3CO₂
+• **방청**: Zn + Fe²⁺ → Zn²⁺ + Fe (Zn이 산화)
+• **배터리**: Zn + Cu²⁺ → Zn²⁺ + Cu (galvanic cell)
+
+⚖️ **균형 맞추기**:
+1. 산화수 변화 확인
+2. 전자의 이동 수 균형
+3. 물과 이온으로 완성
+
+🎯 **공업적 중요성**: 제철, 금속 제련, 배터리 제조, 전기분해`;
+                }
+                
+                // ======= 물질의 상태 =======
+                if (message.includes('기체') || message.includes('액체') || message.includes('고체') || message.includes('gas') || message.includes('liquid') || message.includes('solid')) {
+                    return `물질은 기체, 액체, 고체의 3가지 주요 상태로 존재해요!
+
+💨 **기체의 성질**:
+• **보일 법칙**: P₁V₁ = P₂V₂ (온도 일정)
+• **샤를 법칙**: V₁/T₁ = V₂/T₂ (압력 일정)
+• **완전기체법칙**: PV = nRT
+• 입자 간 거리: 매우 큼, 자유로운 움직임
+
+💧 **액체의 성질**:
+• **표면장력**: 분자 간 인력과 관련
+• **점도**: 분자 간 힘의 크기에 의존
+• **끓는점**: 분자 간 인력의 세기 결정
+• 입자 간 거리: 중간, 유동성 존재
+
+🔮 **고체의 성질**:
+• **결정성 고체**: 규칙적인 배열 (NaCl, 금속)
+• **비결정성 고체**: 무질서한 배열 (유리)
+• **모양과 부피**: 모두 고정
+• 입자 간 거리: 가장 작음, 강한 인력
+
+📊 **상변화**:
+고체 ↔ 액체 ↔ 기체 (각 단계마다 서로 다른 특성)
+
+🎯 **공업 적용**: 증류, 결정화, 응집, 분별증류 공정`;
+                }
+                
+                // ======= 용액과 용해도 =======
+                if (message.includes('용액') || message.includes('용해') || message.includes('solution') || message.includes('solubility')) {
+                    return `용액은 용질이 용매에 고르게 섞인 혼합물로, 공업에서 매우 중요해요!
+
+🧪 **용해도의 정의**:
+• **용해도**: 일정 온도에서 용매 100g에 녹을 수 있는 용질의 최대 질량
+• **고체 용질**: 온도 ↑ → 용해도 ↑
+• **기체 용질**: 온도 ↑ → 용해도 ↓
+
+💧 **극성 용매-극성 용질의 원리**:
+• **"유사상溶의 원리"**: 극성-극성, 무극성-무극성
+• **극성 용매**: 물, 에틸알코올 (NaCl, 설탕 용해)
+• **무극성 용매**: 벤젠,.hexane (기름, 왁스 용해)
+
+📊 **농도 표현**:
+• **몰농도(M)**: mol/L
+• **질량백분율(%)**: 용질 질량/용액 질량 × 100
+• **몰분율(X)**:/mol/mol
+
+⚖️ **과포화 용액**:
+• **포화**: 최대 용해량 달성
+• **과포화**: 최대 용해량을 초과한 상태
+• **불안정**: 작은 충격으로도 결정화 발생
+
+🎯 **공업 활용**: 결정화, 재결정, 추출, 염 제조`;
+                }
+                
+                // ======= 유기화학 =======
+                if (message.includes('유기화학') || message.includes('탄화수소') || message.includes('벤젠') || message.includes('알코올') || message.includes('organic') || message.includes('hydrocarbon')) {
+                    return `유기화학은 탄소(C)를 중심으로 한 화합물을 연구하는 분야예요!
+
+🧪 **탄화수소의 분류**:
+• **지방족**: 알케인(단일결합), 알켈(이중결합), 알카인(삼중결합)
+• **방향족**: 벤젠环, 깊이 결합 (C₆H₆)
+• **포화**: 단일결합만 (C-C 단일결합)
+• **불포화**: 이중/삼중결합 포함
+
+🌀 **벤젠의 특징**:
+• **공명 구조**: 2개의 벤젠环이 동등하게 존재
+• **안정성**: 벤젠环의 특유의 안정성
+• **치환 반응**: 할로겐화, 니트로화 반응 주로 일어남
+
+🍺 **유도체들**:
+• **알코올(-OH)**: 메타놀, 에틸알코올
+• **알데히드(-CHO)**: 포름알데히드
+• **케톤(-CO-)**: 아세톤
+• **카복실산(-COOH)**: 아세트산
+
+🏭 **공업적 중요성**:
+• **원유**: 벤젠, 톨루엔 생산
+• **플라스틱**: 폴리에틸렌, 폴리스티렌
+• **의약품**: 아스피린, 파라세타몰
+
+🎯 **작용기의 영향**: 작용기가 물리적·화학적 성질 결정`;
+                }
+                
+                // ======= 화학공업양론 =======
+                if (message.includes('공업양론') || message.includes('공정') || message.includes('물질수지') || message.includes('에너지수지') || message.includes('process')) {
+                    return `화학공업양론은 화학공정에서 물질과 에너지의 이동을 정량적으로 다루는 분야예요!
+
+🏭 **공정의 구성**:
+• **원료 투입**: 원료 준비와 전처리
+• **반응 공정**: 화학반응과 반응기
+• **분리·정제**: 필요 물질 분리
+• **제품 생산**: 최종 제품 제조
+
+📊 **물질수지(Material Balance)**:
+• **기본 원리**: 유입 = 유출 + 축적
+• **정상 상태**: 축적량 = 0 → 유입 = 유출
+• **질량 보존 법칙**: 총 질량 일정
+
+⚡ **에너지수지(Energy Balance)**:
+• **입력**: 반응열 + 반영응열 + 유입 에너지
+• **출력**: 생성열 + 반영응열 + 유출 에너지
+• **ΔE = Q - W** (제1법칙)
+
+🔢 **계산 예시**:
+• **유량 계산**: mol/s, kg/s 단위
+• **수율 계산**: (실제 생산량/이론 생산량) × 100%
+• **전환율**: 반응한 원료량/투입 원료량 × 100%
+
+🎯 **공업적 의의**: 공정 최적화, 수율 개선, 원가 계산`;
+                }
+                
+                // ======= 측정과 계측 =======
+                if (message.includes('측정') || message.includes('계측') || message.includes('온도계') || message.includes('압력계') || message.includes('sensor')) {
+                    return `공업에서의 측정은 공정 제어와 품질 관리를 위한 핵심 기술이에요!
+
+🌡️ **온도 계측**:
+• **액주식 온도계**: 수은, 알코올 사용
+• **전기식 온도계**: 열전대, 저항 온도계 (RTD)
+• **복사식 온도계**: 적색선 Scanner
+• **응답 속도**: 계측 대상에 따라 선택
+
+📏 **압력 계측**:
+• **부르동관**: 기계적 압력계
+• **피에조 저항식**: 전기적 저항 변화 이용
+• **U자관/단관**: 기본 압력 측정
+
+🌊 **유체 측정**:
+• **층류**: 깔때기형 흐름, 낮은 유속
+• **난류**: 소용돌이 흐름, 높은 유속
+• **유량계**: 토익(TI), 와류(Vortex) 형
+
+📊 **계측의 중요성**:
+• **공정 제어**: 온도·압력·유량 제어
+• **품질 관리**: 제품 품질 일관성 확보
+• **안전 관리**: 위험 상황 모니터링
+
+🎯 **다지털화**: IoT,自动化, 실시간 모니터링`;
+                }
+                
+                // ======= 환경과 안전 =======
+                if (message.includes('환경') || message.includes('안전') || message.includes('법규') || message.includes('MSDS') || message.includes('safety')) {
+                    return `환경과 안전은 현대 화학공업에서 가장 중요한 이슈예요!
+
+📜 **환경 법규**:
+• **대기환경보전법**: 대기오염물질 배출 규제
+• **물환경보전법**: 수질오염물질 배출 규제
+• **폐기물관리법**: 폐기물 처리 기준
+• **화학물질관리법**: 유해물질 관리
+
+🛡️ **화학물질 관리**:
+• **MSDS**: 물질안전보건자료 확인 필수
+• **보관 관리**: 밀폐용기, 내화학성 재질
+• **취급 수칙**: 보호구 착용, 환기 확보
+• **사고 대응**: 초기 대응 체계 구축
+
+⚠️ **주요 위험 요인**:
+• **매체 노출**: 기체, 액체, 고체 흡수
+• ** Chemical burn**: 피부 화상
+• **폭발**: 가연성 기체·분진
+• **누출**:大气및 수질 오염
+
+📋 **안전 관리 체계**:
+• **예방**: 사전 위험성 평가, 안전교육
+• **대응**: 응급처치, 신고체계
+• **감사**: 정기 안전 점검
+
+🎯 **지속가능성**: Green Chemistry, Circular Economy`;
+                }
+
+                // ======= 확장 키워드 300개 (신규 추가) =======
+                
+                // 1단원 추가: 원자 구조·전기 음성도
+                if (message.includes('양이온 형성 에너지')) {
+                    return `양이온 형성 에너지는 전자 제거 과정에서 필요한 에너지입니다. 학생이 전자 이동 과정을 분석함으로써 **논리적 사고 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('음이온 형성 경향')) {
+                    return `전자 받기 경향이 큰 원소일수록 음이온 형성 경향이 큼. 학생이 성질 비교를 수행하며 **자료 해석 역량**이 드러납니다.`;
+                }
+                
+                if (message.includes('쿨롱 힘')) {
+                    return `쿨롱 힘은 전하 사이의 인력을 의미합니다. 학생이 모형 분석을 통해 **구조 이해 역량**을 보입니다.`;
+                }
+                
+                if (message.includes('유효 핵전하')) {
+                    return `전자가 실제로 느끼는核电의 인력입니다. 학생이 껍질 효과를 해석하며 **추론 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('차폐 효과')) {
+                    return `내부 전자가 외부 전자를 가리는 현상입니다. 학생이 전자 배치 구조를 분석하며 **개념 이해 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('전기 친화도')) {
+                    return `전자를 얻을 때의 에너지 변화입니다. 학생이 반응성 경향을 해석하며 **추론 역량**이 드러납니다.`;
+                }
+                
+                if (message.includes('준금속')) {
+                    return `준금속은 금속과 비금속의 성질을 모두 포함합니다. 학생이 표를 분석하며 **분류 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('동소체')) {
+                    return `같은 원소가 여러 구조 형태로 존재하는 경우입니다. 학생이 구조 차이를 비교하며 **구조 분석 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('배위 결합')) {
+                    return `한쪽 원자가 전자쌍을 모두 제공해 형성되는 결합입니다. 학생이 결합 방식 차이를 분석하며 **추론 역량**이 발휘됩니다.`;
+                }
+                
+                // 2단원 추가: 물질 상태·용액 확장
+                if (message.includes('비점 상승') || message.includes('끓는점 상승')) {
+                    return `용질이 용매의 증기압을 낮추어 끓는점이 올라가는 현상입니다. 학생이 변화량을 계산하며 **수리 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('빙점 강하')) {
+                    return `용질이 존재하면 어는점이 낮아지는 현상입니다. 학생이 변화 경향을 분석하며 **자료 해석 역량**이 드러납니다.`;
+                }
+                
+                if (message.includes('삼중점')) {
+                    return `세 가지 상태가 공존하는 조건입니다. 학생이 상태도를 해석하며 **분석 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('임계점')) {
+                    return `기체와 액체의 구분이 사라지는 지점입니다. 학생이 상태 변화를 분석하며 **해석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('용해 엔탈피')) {
+                    return `입자 간 상호작용 변화에 따른 에너지 변화입니다. 학생이 열변화를 분석하며 **추론 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('반데르발스 힘')) {
+                    return `약한 분자 간 인력입니다. 비교 활동에서 **분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('수소 결합')) {
+                    return `극성 분자 간 강한 상호작용입니다. 물의 성질 설명에서 **추론 역량**이 발생합니다.`;
+                }
+                
+                if (message.includes('혼합 엔트로피')) {
+                    return `혼합 시 엔트로피가 증가하는 경향입니다. 학생이 열역학 개념을 이해하며 **논리적 사고 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('부분 압력')) {
+                    return `각 기체 압력의 합으로 결정되는 압력입니다. 학생이 계산을 수행하며 **수리 역량**이 발휘됩니다.`;
+                }
+                
+                // 3단원 추가: 화학 반응·열역학 확장
+                if (message.includes('자유 에너지') || message.includes('ΔG') || message.includes('자발성')) {
+                    return `자유 에너지 변화는 반응의 자발성을 판단하는 지표입니다. 학생이 ΔG 부호를 해석하며 **추론 역량**을 보입니다.`;
+                }
+                
+                if (message.includes('엔트로피') || message.includes('ΔS')) {
+                    return `무질서도의 변화를 나타내는 값입니다. 학생이 상태 변화 분석에서 **자료 해석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('반응 메커니즘')) {
+                    return `반응이 일어나는 세부 단계를 의미합니다. 학생이 경로를 해석하며 **추론 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('속도 결정 단계')) {
+                    return `전체 반응 속도를 결정하는 가장 느린 단계입니다. 학생이 자료를 비교하며 **분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('휘발성')) {
+                    return `증기압이 높을수록 휘발성이 큽니다. 학생이 실험값을 비교하며 **자료 분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('활성 복합체')) {
+                    return `반응물과 생성물 사이의 불안정 중간 상태입니다. 학생이 에너지도를 분석하며 **해석 역량**이 나타납니다.`;
+                }
+                
+                // 4단원 추가: 무기화학 확장
+                if (message.includes('산화물 종류')) {
+                    return `금속 산화물, 비금속 산화물, 산성 산화물, 염기성 산화물 등으로 분류됩니다. 학생이 분류 활동을 수행하며 **개념 구분 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('과산화물')) {
+                    return `O–O 결합을 가진 특별한 산소 화합물입니다. 학생이 구조를 비교하며 **자료 이해 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('질산염')) {
+                    return `열분해 시 NO₂·O₂ 등을 생성하는 화합물입니다. 학생이 실험 결과를 해석하며 **자료 분석 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('황산염')) {
+                    return `비료, 공업원료 등 다양한 산업에서 사용되는 화합물입니다. 학생이 사례를 조사하며 **적용 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('탄산염')) {
+                    return `산과 만나면 CO₂ 발생과 동반되는 반응을 보입니다. 학생이 관찰을 해석하며 **자료 분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('인산염')) {
+                    return `생체 구성, 비료, 세정제 등 비중이 큰 물질입니다. 학생이 사례를 분석하며 **적용 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('실리카') || message.includes('SiO2')) {
+                    return `내열성, 내화학성이 우수한 무기 화합물입니다. 학생이 활용 사례를 정리하며 **적용 역량**이 발휘됩니다.`;
+                }
+                
+                // 5단원 추가: 유기화학 확장
+                if (message.includes('이성질체')) {
+                    return `결합 배열 차이로 구조가 같아도 성질이 다른 현상입니다. 학생이 구조식을 비교하며 **구조 분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('폴리머') || message.includes('고분자')) {
+                    return `단량체가 반복 결합하여 형성된 거대 분자입니다. 학생이 모형을 분석하며 **구조 이해 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('축합 중합')) {
+                    return `작은 분자를 방출하며 단량체가 결합하는 과정입니다. 학생이 과정을 비교하며 **추론 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('아민')) {
+                    return `–NH₂ 작용기를 가진 염기성 화합물입니다. 학생이 분류 활동을 수행하며 **개념 구분 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('카복실산')) {
+                    return `–COOH 작용기의 영향으로 산성을 띱니다. 학생이 반응 해석에서 **추론 역량**이 발휘됩니다.`;
+                }
+                
+                // 6단원 추가: 화학공업양론 확장
+                if (message.includes('유체 역학')) {
+                    return `유체의 거동과 흐름을 설명하는 학문입니다. 학생이 흐름 형태를 비교하며 **자료 해석 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('레이놀즈 수') || message.includes('Re')) {
+                    return `유동이 층류인지 난류인지를 판단하는 무차원수입니다. 학생이 흐름을 분류하며 **개념 구분 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('반응기') || message.includes('reactor')) {
+                    return `화학 반응이 실제로 진행되는 주요 장치입니다. 학생이 구조를 비교하며 **공정 이해 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('증류탑') || message.includes('distillation')) {
+                    return `끓는점 차이를 이용해 성분을 분리하는 장치입니다. 학생이 온도 변화를 분석하며 **자료 해석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('결정화') || message.includes('crystallization')) {
+                    return `용질이 과포화 상태에서 고체 결정으로 석출되는 과정입니다. 학생이 조건을 정리하며 **추론 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('열교환기')) {
+                    return `서로 다른 유체 간 열을 전달하는 장치입니다. 학생이 구조를 해석하며 **공정 이해 역량**이 발휘됩니다.`;
+                }
+                
+                // 7단원 추가: 측정·계측 확장
+                if (message.includes('열전대') || message.includes('thermocouple')) {
+                    return `두 금속의 온도 차이로 발생하는 기전력을 이용한 온도 센서입니다. 학생이 측정값을 해석하며 **자료 처리 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('RTD') || message.includes('저항 온도')) {
+                    return `저항이 온도에 따라 정밀하게 변하는 온도 센서입니다. 학생이 장치를 분석하며 **자료 이해 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('초음파 유량계')) {
+                    return `초음파 전달 시간 차이를 이용해 유량을 측정하는 센서입니다. 학생이 장치 구조를 해석하며 **추론 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('코리올리 유량계')) {
+                    return `진동하는 관에서 발생하는 관성력을 기반으로 질량 유량을 측정합니다. 학생이 측정 원리를 분석하며 **자료 처리 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('광학 센서')) {
+                    return `빛의 강도, 투과, 반사를 감지하는 센서입니다. 학생이 센서 반응을 비교하며 **분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('데이터 로거') || message.includes('data logger')) {
+                    return `온도, 압력, 습도 등 데이터를 자동 저장하는 기기입니다. 학생이 기록을 분석하며 **자료 처리 역량**이 발휘됩니다.`;
+                }
+                
+                // 8단원 추가: 환경·안전 확장
+                if (message.includes('미세먼지') || message.includes('PM2.5')) {
+                    return `폐 깊숙이 침투해 건강에 영향을 주는 초미세입자입니다. 학생이 위험성을 분석하며 **위험 인지 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('NOx 제어')) {
+                    return `질소산화물 저감 기술로 선택적 촉매 환원 등이 활용됩니다. 학생이 기술을 비교하며 **과학적 사고 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('전기 집진기') || message.includes('ESP')) {
+                    return `입자를 전기적으로 충전하여 집진판에 부착시키는 기기입니다. 학생이 장치를 해석하며 **자료 처리 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('폐수 생물학적 처리')) {
+                    return `미생물이 유기물을 분해하는 환경오염 처리 기술입니다. 학생이 공정을 분석하며 **과학적 사고 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('활성 슬러지')) {
+                    return `공기 공급으로 미생물 활성도를 증가시켜 처리 효율을 높이는 공정입니다. 학생이 흐름을 분석하며 **자료 해석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('공정 안전 관리') || message.includes('PSM')) {
+                    return `절차, 점검, 교육을 기반으로 위험 공정을 체계적으로 관리하는 시스템입니다. 학생이 사례를 분석하며 **문제 분석 역량**이 발휘됩니다.`;
+                }
+                
+                // 200~300번 키워드 추가 (핵심적인 것들 선별)
+                if (message.includes('중합도')) {
+                    return `고분자를 구성하는 반복 단위의 개수입니다. 학생이 수치를 계산하며 **정량적 사고 역량**이 나타납니다.`;
+                }
+                
+                if (message.includes('열가소성')) {
+                    return `가열 시 연화되고 냉각 시 다시 굳는 고분자 성질입니다. 학생이 성질을 비교하며 **자료 분석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('열경화성')) {
+                    return `가열 과정에서 망상 구조가 형성되어 재가열이 어려운 고분자 성질입니다. 학생이 구조를 해석하며 **분석 역량**이 드러납니다.`;
+                }
+                
+                if (message.includes('반응 차수')) {
+                    return `속도식에서 농도 지수의 총합입니다. 학생이 실험값을 분석하며 **정량적 사고 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('반감기')) {
+                    return `반응물의 농도가 절반이 되는 데 걸리는 시간입니다. 학생이 그래프를 분석하며 **자료 해석 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('라디칼') || message.includes('자유라디칼')) {
+                    return `홀전자를 가지고 있어 반응성이 높은 중간체입니다. 학생이 반응 경로를 분석하며 **추론 역량**이 발휘됩니다.`;
+                }
+                
+                if (message.includes('환경 영향 평가') || message.includes('EIA')) {
+                    return `산업 시설의 환경 변화를 예측하고 관리 대책을 수립하는 절차입니다. 학생이 사례를 분석하며 **적용 역량**이 드러납니다.`;
+                }
+                
+                // ======= 기본 응답 =======
+                const responses = [
+                    `안녕하세요! 화학에 대해 무엇이든 물어보세요. 🎯`,
+                    `전문적이고 구체적인 답변을 드리겠습니다. 화학 주제를 말해보세요! ✨`,
+                    `화학과 관련해서 궁금한 점을 알려주세요. 상세히 설명해드리겠습니다. 📚`
+                ];
+                
+                return responses[Math.floor(Math.random() * responses.length)];
+                
+            } catch (error) {
+                console.error('AI 응답 생성 오류:', error);
+                return '일시적인 오류가 발생했습니다. 다시 시도해 주세요.';
+            }
+        }
+
+        // ========================================
+        // 기능 카드 클릭 처리
+        // ========================================
+        function handleFeatureClick(featureType) {
+            if (!isSystemReady) {
+                alert('시스템이 아직 준비 중입니다. 잠시만 기다려주세요.');
+                return;
+            }
+
+            switch(featureType) {
+                case 'concept-map':
+                    alert('🗺️ 개념지도 기능이 곧 출시됩니다!\n\n화학과목의 모든 개념을 연결된 지도 형태로 시각화하여 학습할 수 있는 기능입니다.');
+                    break;
+                case 'misconception':
+                    alert('🔍 오개념 진단 기능이 곧 출시됩니다!\n\n개인 맞춤형 진단을 통해 오개념을 발견하고 정확히 교정할 수 있는 기능입니다.');
+                    break;
+                case 'report':
+                    alert('📊 평가 보고서 기능이 곧 출시됩니다!\n\n학습 진도와 약점을 분석하여 개인별 학습 계획을 제안하는 기능입니다.');
+                    break;
+                default:
+                    alert('기능이 곧 출시됩니다!');
+            }
+        }
+
+        // ========================================
+        // 시스템 초기화 (버튼 상태 초기화 포함)
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM 준비 완료');
+            
+            // 초기 버튼 상태 설정
+            updateButtonState();
+            
+            // 입력 필드 포커스
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) {
+                chatInput.focus();
+            }
+            
+            // 즉시 로딩 완료
+            setTimeout(() => {
+                console.log('✅ 시스템 초기화 완료');
+                hideLoadingScreen();
+            }, 800);
+        });
+
+        // ========================================
+        // 최후의 안전장치
+        // ========================================
+        setTimeout(() => {
+            if (!isSystemReady) {
+                console.log('🚨 최후의 안전장치 발동');
+                hideLoadingScreen();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
